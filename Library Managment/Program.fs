@@ -321,11 +321,20 @@ let showUserPage (userName: string) =
     borrowReturnStatusLabel.TextAlign <- ContentAlignment.MiddleCenter
 
     borrowButton.Click.Add(fun _ -> 
-        if Library.borrowBook titleInput.Text  then
+        // Cast userName to Option<string>
+        let userNameOption = 
+            if String.IsNullOrEmpty(userName) then 
+                None 
+            else 
+                Some userName
+
+        // Attempt to borrow the book
+        if Library.borrowBook titleInput.Text userNameOption then
             borrowReturnStatusLabel.Text <- $"Book '{titleInput.Text}' borrowed."
         else
             borrowReturnStatusLabel.Text <- "Borrowing failed."
     )
+
 
     returnButton.Click.Add(fun _ -> 
         if Library.returnBook titleInput.Text then
