@@ -305,45 +305,72 @@ let showUserPage (userName: string) =
     tabControl.Left <- 20
 
     // Create "Borrow/Return Books" Tab with a cleaner layout
-    let borrowReturnTab = new TabPage("Borrow/Return Books")
+// Create "Borrow/Return Books" Tab with a cleaner layout
+    let borrowReturnTab = new TabPage("Books")
     borrowReturnTab.BackColor <- Color.Honeydew
+
+    // Title label and input for the search bar
+    let searchLabel = new Label(Text = "Search Book by Title:", Top = 20, Left = 20, Width = 150)
+    let searchInput = new TextBox(Top = 20, Left = 170, Width = 200)
+
+    // Search button to trigger the search functionality
+    let searchButton = new Button(Text = "Search", Top = 20, Left = 450, Width = 100, Height = 20)
+    searchButton.BackColor <- Color.LightCoral
+
+
+    // Panel to hold the book list and dynamically update it
+    let booksPanel = new Panel(Top = 50, Left = 20, Width = 740, Height = 300)
+    booksPanel.AutoScroll <- true
+
+    // Function to display books in the panel
+    let displayBooks (books: seq<Book>) =
+        // Clear existing controls in booksPanel
+        booksPanel.Controls.Clear()
+
+        // Filter the books to show only available ones
+        let availableBooks = books
+    
+        // Dynamically add each available book as a label to the panel
+        for book in availableBooks do
+            let bookLabel = new Label(Text = $"""{book.Title} by {book.Author} - {book.Genre} - {book.Price} - {(if book.IsBorrowed then "Borrowed" else "Available")}""")
+            bookLabel.Width <- 700
+            bookLabel.Top <- 30 * booksPanel.Controls.Count + 10 // Add spacing between books
+            booksPanel.Controls.Add(bookLabel)
+
+    // Initially display all books
+    displayBooks (getBooks())
+
+    // Search functionality
+    searchButton.Click.Add(fun _ ->
+        let searchTerm = searchInput.Text
+        if String.IsNullOrEmpty(searchTerm) then
+            // If no search term, show all books
+            displayBooks (getBooks())
+        else
+            // If there's a search term, show matching books
+            let searchResults = searchBooksByName searchTerm
+            displayBooks searchResults
+    )
+
+
+    // Borrow button functionality
+
+
+
 
     let titleLabel = new Label(Text = "Title:", Top = 20, Left = 20, Width = 100)
     let titleInput = new TextBox(Top = 20, Left = 120, Width = 200)
 
-    let borrowButton = new Button(Text = "Borrow Book", Top = 60, Left = 120, Width = 150, Height = 40)
-    borrowButton.BackColor <- Color.LightCoral  // Changed to LightCoral
-    let returnButton = new Button(Text = "Return Book", Top = 60, Left = 300, Width = 150, Height = 40)
-    returnButton.BackColor <- Color.LightCoral  // Changed to LightCoral
-
-    let borrowReturnStatusLabel = new Label(Top = 120, Left = 20, Width = 740, Height = 30)
-    borrowReturnStatusLabel.ForeColor <- Color.Red
-    borrowReturnStatusLabel.TextAlign <- ContentAlignment.MiddleCenter
-
-    borrowButton.Click.Add(fun _ -> 
-        // Cast userName to Option<string>
-        let userNameOption = 
-            if String.IsNullOrEmpty(userName) then 
-                None 
-            else 
-                Some userName
-
-        // Attempt to borrow the book
-        if Library.borrowBook titleInput.Text userNameOption then
-            borrowReturnStatusLabel.Text <- $"Book '{titleInput.Text}' borrowed."
-        else
-            borrowReturnStatusLabel.Text <- "Borrowing failed."
-    )
+    borrowReturnTab.Controls.AddRange([| 
+        searchLabel; 
+        searchInput; 
+        searchButton; 
+        titleLabel; 
+        titleInput; 
+        booksPanel 
+    |])
 
 
-    returnButton.Click.Add(fun _ -> 
-        if Library.returnBook titleInput.Text then
-            borrowReturnStatusLabel.Text <- $"Book '{titleInput.Text}' returned."
-        else
-            borrowReturnStatusLabel.Text <- "Returning failed."
-    )
-
-    borrowReturnTab.Controls.AddRange([| titleLabel; titleInput; borrowButton; returnButton; borrowReturnStatusLabel |])
 
     // Create "Available Books" Tab with more attractive design
     let availableBooksTab = new TabPage("Available Books")
@@ -357,13 +384,49 @@ let showUserPage (userName: string) =
         let availableBooks = 
             Library.getBooks()
             |> Seq.filter (fun book -> not book.IsBorrowed)
-            |> Seq.map (fun book -> $"{book.Title} by {book.Author}")
+            |> Seq.map (fun book -> $"Title:\t{book.Title}\t\tAuthor:\t{book.Author}\t\tBorrowPrice:\t{book.Price}\t\tGenre:\t{book.Genre}")
             |> String.concat "\n"
         booksListBox.Items.Clear()
         booksListBox.Items.AddRange(availableBooks.Split('\n') |> Array.map (fun book -> box book))
     )
 
-    availableBooksTab.Controls.AddRange([| availableBooksButton; booksListBox |])
+    let borrowButton = new Button(Text = "Borrow Book", Top = 330, Left = 20, Width = 200, Height = 40)
+    borrowButton.BackColor <- Color.LightCoral  // Changed to LightCoral
+
+    borrowButton.Click.Add(fun _ -> 
+        let selectedBook = booksListBox.SelectedItem
+
+        // Ensure the selectedItem is a string
+        if selectedBook <> null then
+            let selectedBookString = selectedBook.ToString() // Cast the selected item to string
+
+            // Extract book title from the formatted string
+            let bookTitle = 
+                selectedBookString.Split([| "Title:" |], StringSplitOptions.None).[1]
+                |> fun part -> part.Split([| "Author:" |], StringSplitOptions.None).[0]
+                |> fun part -> part.Trim()  // Trim any leading/trailing whitespace
+
+            // Check for username
+            let userNameOption = 
+                if String.IsNullOrEmpty(userName) then 
+                    None 
+                else 
+                    Some userName
+
+            // Borrow the book
+            if Library.borrowBook bookTitle userNameOption then
+                MessageBox.Show($"Book '{bookTitle}' borrowed successfully.") |> ignore
+                booksListBox.Items.Remove(selectedBook)
+            else
+                MessageBox.Show("Borrowing failed.") |> ignore
+        else
+            MessageBox.Show("Please select a book to borrow.") |> ignore
+    )
+
+
+    // Add controls to the tab
+    availableBooksTab.Controls.AddRange([| availableBooksButton; booksListBox; borrowButton |])
+
 
 
     let returnBooksTab = new TabPage("Return Books")
