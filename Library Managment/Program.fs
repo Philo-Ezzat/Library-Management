@@ -83,7 +83,7 @@ let showSignupForm () =
             usernameInput.Text <- ""
             passwordInput.Text <- ""
             let timer = new Timer()
-            timer.Interval <- 2000 // 2 seconds
+            timer.Interval <- 500 // 2 seconds
             timer.Tick.Add(fun _ -> 
                 timer.Stop()
                 signupForm.Invoke(new Action(fun () -> signupForm.Close())) // Close the form on the UI thread
