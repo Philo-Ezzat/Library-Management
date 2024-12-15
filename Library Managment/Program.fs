@@ -6,6 +6,7 @@ open System.IO
 open Newtonsoft.Json
 open System.Security.Cryptography
 open System.Text
+open LibraryManagement.Library
 
 // Define a type to store the current user type (Admin or User)
 type UserType = Admin | User
@@ -213,6 +214,8 @@ let showAdminPage () =
     authorLabel.Font <- new Font("Arial", 12.0f)
     let genreLabel = new Label(Text = "Genre:", Top = 100, Left = 30, Width = 100)
     genreLabel.Font <- new Font("Arial", 12.0f)
+    let priceLabel = new Label(Text = "Price:", Top = 140, Left = 30, Width = 100)
+    priceLabel.Font <- new Font("Arial", 12.0f)
 
     let titleInput = new TextBox(Top = 20, Left = 150, Width = 250)
     titleInput.Font <- new Font("Arial", 12.0f)
@@ -220,16 +223,17 @@ let showAdminPage () =
     authorInput.Font <- new Font("Arial", 12.0f)
     let genreInput = new TextBox(Top = 100, Left = 150, Width = 250)
     genreInput.Font <- new Font("Arial", 12.0f)
-
-    let addBookButton = new Button(Text = "Add Book", Top = 140, Left = 150, Width = 250, Height = 40)
+    let priceInput = new TextBox(Top = 140, Left = 150, Width = 250)
+    priceInput.Font <- new Font("Arial", 12.0f)
+    let addBookButton = new Button(Text = "Add Book", Top = 180, Left = 150, Width = 250, Height = 40)
     addBookButton.BackColor <- Color.CadetBlue
     addBookButton.Font <- new Font("Arial", 12.0f, FontStyle.Bold)
     addBookButton.Click.Add(fun _ -> 
-        Library.addBook titleInput.Text authorInput.Text genreInput.Text
+        Library.addBook titleInput.Text authorInput.Text genreInput.Text priceInput.Text
         MessageBox.Show($"Book '{titleInput.Text}' added.") |> ignore
     )
 
-    addBookTab.Controls.AddRange([| titleLabel; titleInput; authorLabel; authorInput; genreLabel; genreInput; addBookButton |])
+    addBookTab.Controls.AddRange([| titleLabel; titleInput; authorLabel; authorInput; genreLabel; genreInput;priceLabel; priceInput; addBookButton |])
 
     // View Books Tab
     let viewBooksTab = new TabPage("View Books")
@@ -265,10 +269,31 @@ let showAdminPage () =
 
     viewBooksTab.Controls.AddRange([| availableBooksButton; borrowedBooksButton; booksListBox |])
 
-    // Add Tabs to TabControl
+    let  loadRevenueFromFile () =
+        let revenueFilePath = "revenue.json"
+        if File.Exists(revenueFilePath) then
+            let json = File.ReadAllText(revenueFilePath)
+            match Decimal.TryParse(json) with
+            | (true, revenue) -> revenue
+            | _ -> 0M
+        else
+            0M
+
+    let viewRevenueTab = new TabPage("View Total Revenue")
+    viewRevenueTab.BackColor <- Color.LightGoldenrodYellow
+
+    let revenueLabel = new Label(Text = "Total Revenue: $0.00", Top = 20, Left = 30, Width = 200)
+    revenueLabel.Font <- new Font("Arial", 12.0f)
+
+    // Retrieve the total revenue and update the label text
+    let totalRevenue = loadRevenueFromFile()
+    revenueLabel.Text <- sprintf "Total Revenue: $%M" totalRevenue
+
+    viewRevenueTab.Controls.AddRange([| revenueLabel |])
+
     tabControl.TabPages.Add(addBookTab)
     tabControl.TabPages.Add(viewBooksTab)
-
+    tabControl.TabPages.Add(viewRevenueTab)
     form.Controls.Add(tabControl)
     form.ShowDialog()
 
@@ -303,7 +328,7 @@ let showUserPage () =
     borrowReturnStatusLabel.TextAlign <- ContentAlignment.MiddleCenter
 
     borrowButton.Click.Add(fun _ -> 
-        if Library.borrowBook titleInput.Text then
+        if Library.borrowBook titleInput.Text  then
             borrowReturnStatusLabel.Text <- $"Book '{titleInput.Text}' borrowed."
         else
             borrowReturnStatusLabel.Text <- "Borrowing failed."
