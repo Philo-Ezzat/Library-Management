@@ -365,9 +365,45 @@ let showUserPage (userName: string) =
 
     availableBooksTab.Controls.AddRange([| availableBooksButton; booksListBox |])
 
+
+    let returnBooksTab = new TabPage("Return Books")
+    returnBooksTab.BackColor <- Color.Honeydew
+
+    let borrowedBooksButton = new Button(Text = "Show Borrowed Books", Top = 20, Left = 20, Width = 200, Height = 40)
+    borrowedBooksButton.BackColor <- Color.LightCoral  // Changed to LightCoral
+    let borrowedBooksListBox = new ListBox(Top = 70, Left = 20, Width = 700, Height = 250)
+
+    let returnSelectedBookButton = new Button(Text = "Return Selected Book", Top = 330, Left = 20, Width = 200, Height = 40)
+    returnSelectedBookButton.BackColor <- Color.LightCoral  // Changed to LightCoral
+
+    borrowedBooksButton.Click.Add(fun _ -> 
+        let borrowedBooks = 
+            Library.getBorrowedBooksByUser userName
+            |> Seq.map (fun book -> $"{book.Title} by {book.Author}")
+            |> String.concat "\n"
+        borrowedBooksListBox.Items.Clear()
+        borrowedBooksListBox.Items.AddRange(borrowedBooks.Split('\n') |> Array.map (fun book -> box book))
+    )
+
+    returnSelectedBookButton.Click.Add(fun _ ->
+        let selectedBook = borrowedBooksListBox.SelectedItem
+        if selectedBook <> null then
+            let bookTitle = selectedBook.ToString().Split(" by ").[0]
+            if Library.returnBook bookTitle then
+                MessageBox.Show($"Book '{bookTitle}' returned successfully.") |> ignore
+                borrowedBooksListBox.Items.Remove(selectedBook)
+            else
+                MessageBox.Show("Returning failed.") |> ignore
+        else
+            MessageBox.Show("Please select a book to return.") |> ignore
+    )
+
+    returnBooksTab.Controls.AddRange([| borrowedBooksButton; borrowedBooksListBox; returnSelectedBookButton |])
+    
     // Add Tabs to TabControl
     tabControl.TabPages.Add(borrowReturnTab)
     tabControl.TabPages.Add(availableBooksTab)
+    tabControl.TabPages.Add(returnBooksTab)
 
     Userform.Controls.Add(tabControl)
     Userform.ShowDialog()

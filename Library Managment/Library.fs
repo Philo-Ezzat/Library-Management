@@ -68,6 +68,10 @@ module Library =
             true
         | _ -> false
 
+    let getBorrowedBooksByUser (username: string) =
+        let library = loadLibraryFromFile()
+        library |> Map.toSeq |> Seq.map snd |> Seq.filter (fun book -> book.Username = Some username)
+
     let returnBook title =
         let library = loadLibraryFromFile()
         match library.TryFind(title) with
@@ -94,7 +98,7 @@ module Library =
                 printfn "Total revenue updated: %M" updatedRevenue
 
                 // Update the book status
-                let updatedBook = { book with IsBorrowed = false; BorrowedDate = None ;Username = None }
+                let updatedBook = { book with IsBorrowed = false; BorrowedDate = None; Username = None }
                 let updatedLibrary = library.Add(title, updatedBook)
                 saveLibraryToFile updatedLibrary
                 true
