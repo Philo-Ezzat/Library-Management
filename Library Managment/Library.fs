@@ -1,82 +1,104 @@
 ﻿namespace LibraryManagement
 open System
 open System.IO
+open Newtonsoft.Json
 
 module Library =
+
+
     type Book = 
         { 
             Title: string
             Author: string
             Genre: string
+            Price: string
             IsBorrowed: bool
             BorrowedDate: Option<DateTime> 
         }
 
-    // File path to store library data
-    let libraryFilePath = "library.txt"
+    let libraryFilePath = "library.json"
+    let revenueFilePath = "revenue.json"
 
-    // Helper to save library to file
+    // Helper to save library data to a JSON file
     let private saveLibraryToFile (library: Map<string, Book>) =
-        let lines =
-            library
-            |> Map.toSeq
-            |> Seq.map (fun (_, book) -> 
-                $"""{book.Title}|{book.Author}|{book.Genre}|{book.IsBorrowed}|{match book.BorrowedDate with Some date -> date.ToString("o") | None -> ""}""")
-        File.WriteAllLines(libraryFilePath, lines)
+        let json = JsonConvert.SerializeObject(library)
+        File.WriteAllText(libraryFilePath, json)
 
-    // Helper to load library from file
+    // Helper to load library data from a JSON file
     let private loadLibraryFromFile () =
         if File.Exists(libraryFilePath) then
-            let lines = File.ReadAllLines(libraryFilePath)
-            lines
-            |> Seq.map (fun line ->
-                let parts = line.Split('|')
-                let borrowedDate = 
-                    if parts.Length > 4 && not (String.IsNullOrWhiteSpace(parts.[4])) then 
-                        Some(DateTime.Parse(parts.[4])) 
-                    else 
-                        None
-                { Title = parts.[0]; Author = parts.[1]; Genre = parts.[2]; IsBorrowed = Boolean.Parse(parts.[3]); BorrowedDate = borrowedDate })
-            |> Seq.map (fun book -> book.Title, book)
-            |> Map.ofSeq
+            let json = File.ReadAllText(libraryFilePath)
+            JsonConvert.DeserializeObject<Map<string, Book>>(json)
         else
-            Map.empty // Return an empty map if the file does not exist
+            Map.empty
 
-    // Add a new book
-    let addBook title author genre =
-        let library = loadLibraryFromFile() // Load the latest state
-        let book = { Title = title; Author = author; Genre = genre; IsBorrowed = false; BorrowedDate = None }
+    // Helper to load total revenue from a JSON file
+    let private loadRevenueFromFile () =
+        if File.Exists(revenueFilePath) then
+            let json = File.ReadAllText(revenueFilePath)
+            match Decimal.TryParse(json) with
+            | (true, revenue) -> revenue
+            | _ -> 0M
+        else
+            0M
+
+    // Helper to save total revenue to a JSON file
+    let private saveRevenueToFile (revenue: decimal) =
+        let json = revenue.ToString()
+        File.WriteAllText(revenueFilePath, json)
+
+    let addBook title author genre price =
+        let library = loadLibraryFromFile()
+        let book = { Title = title; Author = author; Genre = genre; Price = price; IsBorrowed = false; BorrowedDate = None }
         let updatedLibrary = library.Add(title, book)
         saveLibraryToFile updatedLibrary
 
-    // Search for a book by title
     let searchBook title =
-        let library = loadLibraryFromFile() // Load the latest state
+        let library = loadLibraryFromFile()
         library.TryFind(title)
 
-    // Borrow a book
     let borrowBook title =
-        let library = loadLibraryFromFile() // Load the latest state
+        let library = loadLibraryFromFile()
         match library.TryFind(title) with
         | Some book when not book.IsBorrowed ->
             let updatedBook = { book with IsBorrowed = true; BorrowedDate = Some(DateTime.Now) }
             let updatedLibrary = library.Add(title, updatedBook)
             saveLibraryToFile updatedLibrary
             true
-        | _ -> false // Either book not found or already borrowed
+        | _ -> false
 
-    // Return a book
     let returnBook title =
-        let library = loadLibraryFromFile() // Load the latest state
+        let library = loadLibraryFromFile()
         match library.TryFind(title) with
         | Some book when book.IsBorrowed ->
-            let updatedBook = { book with IsBorrowed = false; BorrowedDate = None }
-            let updatedLibrary = library.Add(title, updatedBook)
-            saveLibraryToFile updatedLibrary
-            true
-        | _ -> false // Either book not found or not borrowed
+            match book.BorrowedDate with
+            | Some borrowedDate ->
+                let daysBorrowed = (DateTime.Now - borrowedDate).Days
+                let dailyRate = 
+                    match Decimal.TryParse(book.Price) with
+                    | (true, price) -> price * 0.01M // Assuming 1% of the book's price per day
+                    | _ -> 0M
+                let cost = dailyRate * decimal daysBorrowed
+                printfn "The cost of borrowing '%s' for %d day(s) is: %M" title daysBorrowed cost
 
-    // Get all books
+                // Update total revenue
+                let currentRevenue = loadRevenueFromFile()
+                let updatedRevenue = currentRevenue + cost
+                saveRevenueToFile updatedRevenue
+                printfn "Total revenue updated: %M" updatedRevenue
+
+                // Update the book status
+                let updatedBook = { book with IsBorrowed = false; BorrowedDate = None }
+                let updatedLibrary = library.Add(title, updatedBook)
+                saveLibraryToFile updatedLibrary
+                true
+            | None -> 
+                printfn "Error: BorrowedDate is missing."
+                false
+        | _ -> 
+            printfn "Error: Book not found or not currently borrowed."
+            false
+
     let getBooks () =
-        let library = loadLibraryFromFile() // Load the latest state
+        let library = loadLibraryFromFile()
         library |> Map.toSeq |> Seq.map snd

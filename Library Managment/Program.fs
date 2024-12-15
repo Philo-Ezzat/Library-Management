@@ -195,14 +195,14 @@ let showUserPage () =
         if Library.borrowBook titleInput.Text then
             borrowReturnStatusLabel.Text <- $"Book '{titleInput.Text}' borrowed."
         else
-            borrowReturnStatusLabel.Text <- "Please Enter Book Title"
+            borrowReturnStatusLabel.Text <- "Borrowing failed."
     )
 
     returnButton.Click.Add(fun _ -> 
         if Library.returnBook titleInput.Text then
             borrowReturnStatusLabel.Text <- $"Book '{titleInput.Text}' returned."
         else
-            borrowReturnStatusLabel.Text <- "Please Enter Book Title"
+            borrowReturnStatusLabel.Text <- "Returning failed."
     )
 
     borrowReturnTab.Controls.AddRange([| titleLabel; titleInput; borrowButton; returnButton; borrowReturnStatusLabel |])
