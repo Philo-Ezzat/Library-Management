@@ -14,7 +14,7 @@ module Library =
             Price: string
             IsBorrowed: bool
             BorrowedDate: Option<DateTime> 
-            Username:Option<string>
+            Username: Option<string> 
         }
 
     let libraryFilePath = "library.json"
@@ -50,7 +50,7 @@ module Library =
 
     let addBook title author genre price =
         let library = loadLibraryFromFile()
-        let book = { Title = title; Author = author; Genre = genre; Price = price; IsBorrowed = false; BorrowedDate = None ;Username = None}
+        let book = { Title = title; Author = author; Genre = genre; Price = price; IsBorrowed = false; BorrowedDate = None; Username = None }
         let updatedLibrary = library.Add(title, book)
         saveLibraryToFile updatedLibrary
 
@@ -108,3 +108,7 @@ module Library =
     let getBooks () =
         let library = loadLibraryFromFile()
         library |> Map.toSeq |> Seq.map snd
+
+    let searchBooksByName (name: string) : seq<Book> =
+        let library = loadLibraryFromFile()
+        library |> Map.toSeq |> Seq.map snd |> Seq.filter (fun book -> book.Title.Contains(name))

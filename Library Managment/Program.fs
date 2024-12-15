@@ -84,7 +84,7 @@ let showSignupForm () =
             usernameInput.Text <- ""
             passwordInput.Text <- ""
             let timer = new Timer()
-            timer.Interval <- 2000 // 2 seconds
+            timer.Interval <- 500 // 2 seconds
             timer.Tick.Add(fun _ -> 
                 timer.Stop()
                 signupForm.Invoke(new Action(fun () -> signupForm.Close())) // Close the form on the UI thread
@@ -141,38 +141,31 @@ let showLoginForm () =
 
     let userType = ref None
     let loginSuccessful = ref false
-
+    let userName = ref ""
     // Handling submit button click event
     submitButton.Click.Add(fun _ -> 
-        match usernameInput.Text, passwordInput.Text with
-        | "admin", "123" -> 
-            userType := Some Admin
-            loginSuccessful := true
-            loginForm.Close()
-        // | "user", "123" -> 
-        //     userType := Some User
-        //     loginSuccessful := true
-        //     loginForm.Close()
-        | _ -> 
-            let hashedPassword = hashPassword passwordInput.Text
-            if File.Exists(usersFilePath) then
-                let json = File.ReadAllText(usersFilePath)
-                let users = JsonConvert.DeserializeObject<User list>(json)
-                match users |> List.tryFind (fun user -> user.Username = usernameInput.Text && user.Password = hashedPassword) with
-                | Some user when user.Username = "admin" -> 
-                    userType := Some Admin
-                    loginSuccessful := true
-                    loginForm.Close()
-                | Some user -> 
-                    userType := Some User
-                    loginSuccessful := true
-                    loginForm.Close()
-                | None -> 
-                    loginStatusLabel.Text <- "Invalid credentials, please try again!"
-                    loginStatusLabel.ForeColor <- Color.Red
-            else
+        let hashedPassword = hashPassword passwordInput.Text
+        let usersFilePath = "users.json"
+        if File.Exists(usersFilePath) then
+            let json = File.ReadAllText(usersFilePath)
+            let users = JsonConvert.DeserializeObject<User list>(json)
+            match users |> List.tryFind (fun user -> user.Username = usernameInput.Text && user.Password = hashedPassword) with
+            | Some user when user.Username = "admin" -> 
+                userType := Some Admin
+                loginSuccessful := true
+                userName := user.Username
+                loginForm.Close()
+            | Some user -> 
+                userType := Some User
+                loginSuccessful := true
+                userName := user.Username
+                loginForm.Close()
+            | None -> 
                 loginStatusLabel.Text <- "Invalid credentials, please try again!"
                 loginStatusLabel.ForeColor <- Color.Red
+        else
+            loginStatusLabel.Text <- "Invalid credentials, please try again!"
+            loginStatusLabel.ForeColor <- Color.Red
     )
 
     // Add controls to the form
@@ -189,7 +182,7 @@ let showLoginForm () =
     loginForm.ShowDialog()
 
     // Return the userType after the login form closes
-    !userType
+    (!userType, !userName)
 
 
     // Admin Page with enhanced design and layout
@@ -299,8 +292,8 @@ let showAdminPage () =
 
 
 // User Page with refined design and improved search functionality
-let showUserPage () =
-    let Userform = new Form(Text = "User - Library Management", Width = 800, Height = 500)
+let showUserPage (userName: string) =
+    let Userform = new Form(Text = $"User - Library Management ({userName})", Width = 800, Height = 500)
     Userform.StartPosition <- FormStartPosition.CenterScreen
     Userform.BackColor <- System.Drawing.Color.MistyRose
 
@@ -423,10 +416,10 @@ let showHomePage () =
     loginButton.FlatAppearance.BorderSize <- 0
     loginButton.FlatAppearance.MouseOverBackColor <- Color.FromArgb(100, 193, 150)
     loginButton.Click.Add(fun _ -> 
-        let userType = showLoginForm()  // Display login form and get user type
+        let (userType, userName) = showLoginForm()  // Display login form and get user type
         match userType with
         | Some Admin -> showAdminPage() |> ignore  // Admin page with full functionality
-        | Some User -> showUserPage() |> ignore // User page with limited functionality
+        | Some User -> showUserPage(userName) |> ignore // User page with limited functionality
         | None -> ()  // Do nothing if the form is closed without login
     )
     form.Controls.Add(loginButton)
