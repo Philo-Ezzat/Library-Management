@@ -102,3 +102,7 @@ module Library =
     let getBooks () =
         let library = loadLibraryFromFile()
         library |> Map.toSeq |> Seq.map snd
+
+    let searchBooksByName (name: string) : seq<Book> =
+        let library = loadLibraryFromFile()
+        library |> Map.toSeq |> Seq.map snd |> Seq.filter (fun book -> book.Title.Contains(name))
