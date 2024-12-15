@@ -2,9 +2,103 @@
 open System.Windows.Forms
 open System.Drawing
 open LibraryManagement  // Ensure you have the LibraryManagement module
+open System.IO
+open Newtonsoft.Json
+open System.Security.Cryptography
+open System.Text
 
 // Define a type to store the current user type (Admin or User)
 type UserType = Admin | User
+type User = {
+    Username: string
+    Password: string
+}
+
+let hashPassword (password: string) =
+    using (SHA256.Create()) (fun sha256 ->
+        let bytes = Encoding.UTF8.GetBytes(password)
+        let hash = sha256.ComputeHash(bytes)
+        BitConverter.ToString(hash).Replace("-", "").ToLower()
+    )
+let usersFilePath = "users.json"
+let saveUser (user: User) =
+    let users = 
+        if File.Exists(usersFilePath) then
+            let json = File.ReadAllText(usersFilePath)
+            JsonConvert.DeserializeObject<User list>(json)
+        else
+            []
+    let updatedUsers = user :: users
+    let updatedJson = JsonConvert.SerializeObject(updatedUsers, Formatting.Indented)
+    File.WriteAllText(usersFilePath, updatedJson)
+
+let showSignupForm () =
+    let signupForm = new Form(Text = "Signup Page", Width = 500, Height = 400)
+    signupForm.StartPosition <- FormStartPosition.CenterScreen
+    signupForm.BackColor <- Color.White
+
+    // Label for "Create a new account"
+    let titleLabel = new Label(Text = "Create a new account", Top = 20, Left = 30, Width = 440, Height = 40)
+    titleLabel.Font <- new Font("Arial", 18.0f, FontStyle.Bold)
+    titleLabel.ForeColor <- Color.MidnightBlue
+    titleLabel.TextAlign <- ContentAlignment.MiddleCenter
+
+    // Username and Password Inputs
+    let labelTop = 80
+    let usernameLabel = new Label(Text = "Username:", Top = labelTop, Left = 30, Width = 120, Height = 30)
+    let usernameInput = new TextBox(Top = labelTop + 30, Left = 30, Width = 420, Height = 40)
+    let passwordLabel = new Label(Text = "Password:", Top = labelTop + 90, Left = 30, Width = 120, Height = 30)
+    let passwordInput = new TextBox(Top = labelTop + 120, Left = 30, Width = 420, Height = 40)
+    
+    // Configure inputs
+    passwordInput.PasswordChar <- '*'
+    usernameInput.Font <- new Font("Arial", 12.0f)
+    passwordInput.Font <- new Font("Arial", 12.0f)
+
+    // Submit Button
+    let submitButton = new Button(Text = "Signup", Top = labelTop + 180, Left = 160, Width = 140, Height = 50)
+    submitButton.Font <- new Font("Arial", 14.0f, FontStyle.Bold)
+    submitButton.BackColor <- Color.FromArgb(100, 193, 150)
+    submitButton.ForeColor <- Color.White
+    submitButton.FlatStyle <- FlatStyle.Flat
+    submitButton.FlatAppearance.BorderSize <- 0
+    submitButton.FlatAppearance.MouseOverBackColor <- Color.FromArgb(28, 161, 166)
+
+    // Status label for signup attempt feedback
+    let signupStatusLabel = new Label(Text = "", Top = labelTop + 250, Left = 30, Width = 440, Height = 30)
+    signupStatusLabel.ForeColor <- Color.Red
+    signupStatusLabel.Font <- new Font("Arial", 12.0f, FontStyle.Italic)
+    signupStatusLabel.TextAlign <- ContentAlignment.MiddleCenter
+
+    // Handling submit button click event
+    submitButton.Click.Add(fun _ -> 
+        if usernameInput.Text <> "" && passwordInput.Text <> "" then
+            let hashedPassword = hashPassword passwordInput.Text
+            let newUser = { Username = usernameInput.Text; Password = hashedPassword }
+            Console.WriteLine($"New User: {newUser}")
+            saveUser newUser
+            signupStatusLabel.Text <- "Signup successful!"
+            signupStatusLabel.ForeColor <- Color.Green
+            // Clear the input fields after successful signup and close the form
+            usernameInput.Text <- ""
+            passwordInput.Text <- ""
+            let timer = new Timer()
+            timer.Interval <- 2000 // 2 seconds
+            timer.Tick.Add(fun _ -> 
+                timer.Stop()
+                signupForm.Invoke(new Action(fun () -> signupForm.Close())) // Close the form on the UI thread
+            )
+            timer.Start()
+        else
+            signupStatusLabel.Text <- "Please fill in all fields."
+            signupStatusLabel.ForeColor <- Color.Red
+    )
+
+    // Add controls to the form
+    signupForm.Controls.AddRange([| titleLabel; usernameLabel; usernameInput; passwordLabel; passwordInput; submitButton; signupStatusLabel |])
+
+    // Show the signup form as a dialog
+    signupForm.ShowDialog()
 
 let showLoginForm () =
     let loginForm = new Form(Text = "Login Page", Width = 500, Height = 400)
@@ -54,13 +148,30 @@ let showLoginForm () =
             userType := Some Admin
             loginSuccessful := true
             loginForm.Close()
-        | "user", "123" -> 
-            userType := Some User
-            loginSuccessful := true
-            loginForm.Close()
+        // | "user", "123" -> 
+        //     userType := Some User
+        //     loginSuccessful := true
+        //     loginForm.Close()
         | _ -> 
-            loginStatusLabel.Text <- "Invalid credentials, please try again!"
-            loginStatusLabel.ForeColor <- Color.Red
+            let hashedPassword = hashPassword passwordInput.Text
+            if File.Exists(usersFilePath) then
+                let json = File.ReadAllText(usersFilePath)
+                let users = JsonConvert.DeserializeObject<User list>(json)
+                match users |> List.tryFind (fun user -> user.Username = usernameInput.Text && user.Password = hashedPassword) with
+                | Some user when user.Username = "admin" -> 
+                    userType := Some Admin
+                    loginSuccessful := true
+                    loginForm.Close()
+                | Some user -> 
+                    userType := Some User
+                    loginSuccessful := true
+                    loginForm.Close()
+                | None -> 
+                    loginStatusLabel.Text <- "Invalid credentials, please try again!"
+                    loginStatusLabel.ForeColor <- Color.Red
+            else
+                loginStatusLabel.Text <- "Invalid credentials, please try again!"
+                loginStatusLabel.ForeColor <- Color.Red
     )
 
     // Add controls to the form
@@ -267,8 +378,19 @@ let showHomePage () =
     infoLabel2.TextAlign <- ContentAlignment.MiddleCenter
     form.Controls.Add(infoLabel2)
 
-    // Login Button with hover effect and icon (centered in the page)
-    let loginButton = new Button(Text = "Login", Top = 200, Left = (form.Width / 2) - 100, Width = 200, Height = 50)
+   // Signup Button with hover effect and icon (side by side with login button)
+    let signupButton = new Button(Text = "Signup", Top = 200, Left = (form.Width / 2) - 210, Width = 200, Height = 50)
+    signupButton.Font <- new Font("Arial", 14.0f, FontStyle.Bold)
+    signupButton.BackColor <- Color.CadetBlue
+    signupButton.ForeColor <- Color.White
+    signupButton.FlatStyle <- FlatStyle.Flat
+    signupButton.FlatAppearance.BorderSize <- 0
+    signupButton.FlatAppearance.MouseOverBackColor <- Color.FromArgb(100, 193, 150)
+    signupButton.Click.Add(fun _ -> showSignupForm() |> ignore)
+    form.Controls.Add(signupButton)
+    
+    // Login Button with hover effect and icon (side by side with signup button)
+    let loginButton = new Button(Text = "Login", Top = 200, Left = (form.Width / 2) + 10, Width = 200, Height = 50)
     loginButton.Font <- new Font("Arial", 14.0f, FontStyle.Bold)
     loginButton.BackColor <- Color.CadetBlue
     loginButton.ForeColor <- Color.White
@@ -282,7 +404,7 @@ let showHomePage () =
         | Some User -> showUserPage() |> ignore // User page with limited functionality
         | None -> ()  // Do nothing if the form is closed without login
     )
-
+    form.Controls.Add(loginButton)
     // Add buttons and labels to the form
     form.Controls.Add(loginButton)
     form.ShowDialog()
