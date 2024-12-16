@@ -14,7 +14,7 @@ type User = {
     Username: string
     Password: string
 }
-
+// hashing the password
 let hashPassword (password: string) =
     using (SHA256.Create()) (fun sha256 ->
         let bytes = Encoding.UTF8.GetBytes(password)
