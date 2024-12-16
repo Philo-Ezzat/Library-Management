@@ -2,7 +2,7 @@
 open System
 open System.IO
 open Newtonsoft.Json
-
+// library database
 module Library =
 
 
@@ -47,17 +47,17 @@ module Library =
     let private saveRevenueToFile (revenue: decimal) =
         let json = revenue.ToString()
         File.WriteAllText(revenueFilePath, json)
-
+    // add book
     let addBook title author genre price =
         let library = loadLibraryFromFile()
         let book = { Title = title; Author = author; Genre = genre; Price = price; IsBorrowed = false; BorrowedDate = None; Username = None }
         let updatedLibrary = library.Add(title, book)
         saveLibraryToFile updatedLibrary
-
+    //search for a book
     let searchBook title =
         let library = loadLibraryFromFile()
         library.TryFind(title)
-
+    //borrow a book
     let borrowBook title username =
         let library = loadLibraryFromFile()
         match library.TryFind(title) with
@@ -67,11 +67,11 @@ module Library =
             saveLibraryToFile updatedLibrary
             true
         | _ -> false
-
+    //get all the borrowed books
     let getBorrowedBooksByUser (username: string) =
         let library = loadLibraryFromFile()
         library |> Map.toSeq |> Seq.map snd |> Seq.filter (fun book -> book.Username = Some username)
-
+    // return the book
     let returnBook title =
         let library = loadLibraryFromFile()
         match library.TryFind(title) with
